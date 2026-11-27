@@ -2,8 +2,12 @@ from src.models import Apartment, Bill, Parameters, Tenant, TenantSettlement, Tr
 from typing import List, Tuple
 
 class Manager:
-    def __init__(self, parameters: Parameters):
-        self.parameters = parameters 
+    def __init__(self, parameters: Parameters, min_transfer_pln: float | None = None, max_transfer_pln: float | None = None):
+        if min_transfer_pln is not None and max_transfer_pln is not None and min_transfer_pln > max_transfer_pln:
+            raise ValueError("min_transfer_pln cannot be greater than max_transfer_pln")
+        self.parameters = parameters
+        self.min_transfer_pln = min_transfer_pln
+        self.max_transfer_pln = max_transfer_pln
 
         self.apartments = {}
         self.tenants = {}
@@ -18,6 +22,17 @@ class Manager:
         self.transfers = Transfer.from_json_file(self.parameters.transfers_json_path)
         self.bills = Bill.from_json_file(self.parameters.bills_json_path)
 
+    def is_transfer_amount_valid(self, transfer: Transfer) -> bool:
+        amount = abs(transfer.amount_pln)
+        if self.min_transfer_pln is not None and amount < self.min_transfer_pln:
+            return False
+        if self.max_transfer_pln is not None and amount > self.max_transfer_pln:
+            return False
+        return True
+
+    def get_invalid_transfers(self) -> List[Transfer]:
+        return [transfer for transfer in self.transfers if not self.is_transfer_amount_valid(transfer)]
+
     def check_tenants_apartment_keys(self) -> bool:
         for tenant in self.tenants.values():
             if tenant.apartment not in self.apartments:
@@ -25,10 +40,9 @@ class Manager:
         return True
     
     def get_apartment(self, apartment_key: str) -> Apartment | None:
-        for apartment in self.apartments.values():
-            if apartment.key == apartment_key:
-                return apartment
-        return None
+        if apartment_key not in self.apartments:
+            return None
+        return self.apartments[apartment_key]
 
     def get_apartment_costs(self, apartment_key: str, year: int = None, month: int = None) -> float | None:
         if month is not None and (month < 1 or month > 12):
@@ -115,3 +129,6 @@ class Manager:
         if apartment_key not in self.apartments:
             raise ValueError("Apartment key does not exist")
         return any([bill for bill in self.bills if bill.apartment == apartment_key and bill.settlement_year == year and bill.settlement_month == month])
+
+    def validation_system():
+        pass
